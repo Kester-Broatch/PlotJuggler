@@ -37,7 +37,7 @@ public:
 
   virtual const char* name() const override
   {
-    return "Websocket Client";
+    return "WebSocket Client";
   }
 
   virtual bool isDebugPlugin() override
