@@ -33,7 +33,6 @@ target_link_libraries(DataStreamPlotJugglerBridge PRIVATE
   Qt5::WebSockets
   Qt5::Xml
   plotjuggler_base
-  zstd::libzstd_static
 )
 
 target_compile_definitions(DataStreamPlotJugglerBridge PRIVATE

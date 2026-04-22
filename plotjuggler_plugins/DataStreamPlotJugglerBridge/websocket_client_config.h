@@ -13,10 +13,7 @@ public:
   // Persisted fields
   // =========================
   QString url = "ws://127.0.0.1:9090";
-  QStringList topics;
-  unsigned max_array_size = 500;
-  bool clamp_large_arrays = false;
-  bool use_timestamp = false;
+  QString protocol = "JSON";
 
   WebsocketClientConfig();
 
