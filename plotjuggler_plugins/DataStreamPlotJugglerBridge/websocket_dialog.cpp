@@ -15,10 +15,7 @@ WebsocketDialog::WebsocketDialog(const WebsocketClientConfig& config)
   ui->setupUi(this);
   setWindowTitle("WebSocket Client");
 
-  ui->lineEditPort->setValidator(new QIntValidator(1, 65535, this));
-
-  ui->lineEditAddress->setText(config.address);
-  ui->lineEditPort->setText(QString::number(config.port));
+  ui->lineEditUrl->setText(config.url);
 
   ui->spinBoxArraySize->setValue(config.max_array_size);
   if (config.clamp_large_arrays)
@@ -57,16 +54,11 @@ WebsocketDialog::~WebsocketDialog()
   delete ui;
 }
 
-// --- Address / port ---
+// --- URL ---
 
-QString WebsocketDialog::address() const
+QString WebsocketDialog::url() const
 {
-  return ui->lineEditAddress->text().trimmed();
-}
-
-int WebsocketDialog::port(bool* ok) const
-{
-  return ui->lineEditPort->text().toUShort(ok);
+  return ui->lineEditUrl->text().trimmed();
 }
 
 // --- Topic list management ---
@@ -232,8 +224,7 @@ void WebsocketDialog::setConnected(bool connected)
   ui->buttonConnect->setText(connected ? "Connected" : "Connect");
   ui->buttonConnect->blockSignals(false);
 
-  ui->lineEditAddress->setEnabled(!connected);
-  ui->lineEditPort->setEnabled(!connected);
+  ui->lineEditUrl->setEnabled(!connected);
 }
 
 void WebsocketDialog::applyFilter(const QString& filter)
