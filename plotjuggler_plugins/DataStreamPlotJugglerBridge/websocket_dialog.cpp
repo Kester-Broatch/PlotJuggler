@@ -1,11 +1,7 @@
 #include "websocket_dialog.h"
 
-#include <QScrollBar>
 #include <QPushButton>
-#include <QJsonDocument>
-#include <QJsonObject>
 #include <QSettings>
-#include <QTimer>
 
 #include "ui_websocket_client.h"
 
@@ -15,215 +11,91 @@ WebsocketDialog::WebsocketDialog(const WebsocketClientConfig& config)
   ui->setupUi(this);
   setWindowTitle("WebSocket Client");
 
-  ui->lineEditPort->setValidator(new QIntValidator(1, 65535, this));
+  ui->lineEditUrl->setText(config.url);
 
-  ui->lineEditAddress->setText(config.address);
-  ui->lineEditPort->setText(QString::number(config.port));
+  setOkButton("Start", false);
 
-  ui->spinBoxArraySize->setValue(config.max_array_size);
-  if (config.clamp_large_arrays)
-  {
-    ui->radioClamp->setChecked(true);
-  }
-  else
-  {
-    ui->radioSkip->setChecked(true);
-  }
-  ui->checkBoxUseTimestamp->setChecked(config.use_timestamp);
+  connect(ui->comboBoxProtocol, &QComboBox::currentTextChanged, this,
+          &WebsocketDialog::onProtocolChanged);
 
-  auto okBtn = ui->buttonBox->button(QDialogButtonBox::Ok);
-  if (okBtn)
-  {
-    okBtn->setText("Subscribe");
-    okBtn->setEnabled(false);
-  }
-
-  // Enable sorting, default by topic name ascending
-  ui->topicsList->setSortingEnabled(true);
-  ui->topicsList->sortByColumn(0, Qt::AscendingOrder);
-
-  // Wire up internal filter
-  connect(ui->lineEditFilter, &QLineEdit::textChanged, this, &WebsocketDialog::applyFilter);
-
-  // Restore saved geometry
   QSettings s;
   restoreGeometry(s.value("WebsocketClient/dialogGeometry").toByteArray());
 }
 
 WebsocketDialog::~WebsocketDialog()
 {
+  // Options widgets are owned by the parser factories, not by this dialog.
+  // Remove them from the layout and reparent to nullptr so Qt does not
+  // destroy them when the UI is deleted.
+  while (ui->layoutOptions->count() > 0)
+  {
+    auto* item = ui->layoutOptions->takeAt(0);
+    if (item->widget())
+      item->widget()->setParent(nullptr);
+    delete item;
+  }
+
   QSettings s;
   s.setValue("WebsocketClient/dialogGeometry", saveGeometry());
   delete ui;
 }
 
-// --- Address / port ---
+// --- URL ---
 
-QString WebsocketDialog::address() const
+QString WebsocketDialog::url() const
 {
-  return ui->lineEditAddress->text().trimmed();
+  return ui->lineEditUrl->text().trimmed();
 }
 
-int WebsocketDialog::port(bool* ok) const
+// --- Protocol ---
+
+QString WebsocketDialog::selectedProtocol() const
 {
-  return ui->lineEditPort->text().toUShort(ok);
+  return ui->comboBoxProtocol->currentText();
 }
 
-// --- Topic list management ---
-
-void WebsocketDialog::setTopics(const QJsonArray& topics, const QStringList& preselectNames)
+void WebsocketDialog::setSelectedProtocol(const QString& name)
 {
-  auto* view = ui->topicsList;
+  ui->comboBoxProtocol->setCurrentText(name);
+}
 
-  // Save current scroll position
-  auto* vsb = view->verticalScrollBar();
-  const int scroll_y = vsb ? vsb->value() : 0;
-
-  // Merge persisted + current selection for restore
-  QStringList wanted = preselectNames;
-  for (auto* it : view->selectedItems())
+void WebsocketDialog::addProtocol(const QString& name, QWidget* options_widget)
+{
+  ui->comboBoxProtocol->addItem(name);
+  if (options_widget)
   {
-    const auto n = it->text(0);
-    if (!wanted.contains(n))
-    {
-      wanted << n;
-    }
-  }
-
-  // Batch-update without triggering signals
-  view->setUpdatesEnabled(false);
-  view->blockSignals(true);
-  view->setSortingEnabled(false);
-  view->setVisible(false);
-  view->clear();
-
-  for (const auto& v : topics)
-  {
-    if (!v.isObject())
-    {
-      continue;
-    }
-    const auto t = v.toObject();
-    const auto name = t.value("name").toString();
-    const auto type = t.value("type").toString();
-    if (name.isEmpty())
-    {
-      continue;
-    }
-
-    auto* item = new QTreeWidgetItem(view);
-    item->setText(0, name);
-    item->setText(1, type);
-
-    if (wanted.contains(name))
-    {
-      item->setSelected(true);
-    }
-  }
-
-  applyFilter(ui->lineEditFilter->text());
-  view->resizeColumnToContents(0);
-
-  view->setSortingEnabled(true);
-  view->setVisible(true);
-  view->blockSignals(false);
-  view->setUpdatesEnabled(true);
-
-  // Restore scroll position after layout update
-  QTimer::singleShot(0, view, [view, scroll_y]() {
-    if (auto* sb = view->verticalScrollBar())
-    {
-      sb->setValue(scroll_y);
-    }
-  });
-}
-
-bool WebsocketDialog::hasSelection() const
-{
-  return !ui->topicsList->selectedItems().isEmpty();
-}
-
-QStringList WebsocketDialog::selectedTopicNames() const
-{
-  QStringList names;
-  for (auto* it : ui->topicsList->selectedItems())
-  {
-    const auto name = it->text(0);
-    if (!name.isEmpty())
-    {
-      names << name;
-    }
-  }
-  return names;
-}
-
-std::vector<TopicInfo> WebsocketDialog::selectedTopics() const
-{
-  std::vector<TopicInfo> result;
-  for (auto* it : ui->topicsList->selectedItems())
-  {
-    const auto name = it->text(0);
-    if (name.isEmpty())
-    {
-      continue;
-    }
-    TopicInfo info;
-    info.name = name;
-    info.type = it->text(1);
-    result.push_back(std::move(info));
-  }
-  return result;
-}
-
-void WebsocketDialog::clearTopics()
-{
-  ui->topicsList->clear();
-}
-
-// --- Parser options ---
-
-unsigned WebsocketDialog::maxArraySize() const
-{
-  return ui->spinBoxArraySize->value();
-}
-
-bool WebsocketDialog::clampLargeArrays() const
-{
-  return ui->radioClamp->isChecked();
-}
-
-bool WebsocketDialog::useTimestamp() const
-{
-  return ui->checkBoxUseTimestamp->isChecked();
-}
-
-// --- OK button ---
-
-void WebsocketDialog::setOkButton(const QString& text, bool enabled)
-{
-  auto b = ui->buttonBox->button(QDialogButtonBox::Ok);
-  if (b)
-  {
-    b->setText(text);
-    b->setEnabled(enabled);
+    options_widget->setVisible(false);
+    ui->layoutOptions->addWidget(options_widget);
   }
 }
 
-// Signal access for external connections
-QDialogButtonBox* WebsocketDialog::buttonBox() const
+void WebsocketDialog::onProtocolChanged(const QString&)
 {
-  return ui->buttonBox;
+  if (_current_options_widget)
+  {
+    _current_options_widget->setVisible(false);
+    _current_options_widget = nullptr;
+  }
+
+  // Show the options widget for the newly selected protocol (if any).
+  // The widgets were added to layoutOptions during addProtocol(); we iterate
+  // to find the one that belongs to the current selection.  We rely on the
+  // caller having added widgets in the same order as the combobox items.
+  const int idx = ui->comboBoxProtocol->currentIndex();
+  if (idx >= 0 && idx < ui->layoutOptions->count())
+  {
+    auto* item = ui->layoutOptions->itemAt(idx);
+    if (item && item->widget())
+    {
+      _current_options_widget = item->widget();
+      _current_options_widget->setVisible(true);
+    }
+  }
+
+  adjustSize();
 }
 
-QTreeWidget* WebsocketDialog::topicsWidget() const
-{
-  return ui->topicsList;
-}
-
-QPushButton* WebsocketDialog::connectButton() const
-{
-  return ui->buttonConnect;
-}
+// --- Connection state ---
 
 void WebsocketDialog::setConnected(bool connected)
 {
@@ -232,29 +104,30 @@ void WebsocketDialog::setConnected(bool connected)
   ui->buttonConnect->setText(connected ? "Connected" : "Connect");
   ui->buttonConnect->blockSignals(false);
 
-  ui->lineEditAddress->setEnabled(!connected);
-  ui->lineEditPort->setEnabled(!connected);
+  ui->lineEditUrl->setEnabled(!connected);
+  ui->comboBoxProtocol->setEnabled(!connected);
 }
 
-void WebsocketDialog::applyFilter(const QString& filter)
+// --- OK button ---
+
+void WebsocketDialog::setOkButton(const QString& text, bool enabled)
 {
-  auto* list = ui->topicsList;
-  const QString fl = filter.trimmed().toLower();
-
-  for (int i = 0; i < list->topLevelItemCount(); i++)
+  auto* b = ui->buttonBox->button(QDialogButtonBox::Ok);
+  if (b)
   {
-    auto* it = list->topLevelItem(i);
-    const bool selected = it->isSelected();
-
-    if (fl.isEmpty())
-    {
-      it->setHidden(false);
-      continue;
-    }
-
-    const QString name = it->text(0).toLower();
-    const QString type = it->text(1).toLower();
-    const bool match = name.contains(fl) || type.contains(fl);
-    it->setHidden(!(match || selected));
+    b->setText(text);
+    b->setEnabled(enabled);
   }
+}
+
+// --- Signal access ---
+
+QDialogButtonBox* WebsocketDialog::buttonBox() const
+{
+  return ui->buttonBox;
+}
+
+QPushButton* WebsocketDialog::connectButton() const
+{
+  return ui->buttonConnect;
 }

@@ -4,27 +4,11 @@
 #include <QTimer>
 #include <QElapsedTimer>
 
-#include <QHash>
-
 #include "websocket_client_config.h"
 #include "websocket_dialog.h"
 
 #include "PlotJuggler/datastreamer_base.h"
 #include "PlotJuggler/messageparser_base.h"
-
-struct WsState
-{
-  enum class Mode
-  {
-    GetTopics,
-    Subscribe,
-    Data,
-    Close
-  };
-
-  Mode mode = Mode::Close;
-  bool req_in_flight = false;
-};
 
 class WebsocketClient : public PJ::DataStreamer
 {
@@ -53,7 +37,7 @@ public:
 
   virtual const char* name() const override
   {
-    return "PlotJuggler ROS2 Bridge";
+    return "WebSocket Client";
   }
 
   virtual bool isDebugPlugin() override
@@ -75,42 +59,19 @@ private:
 
   QWebSocket _socket;
   QUrl _url;
-  bool _running;
-  bool _closing;
-  bool _paused;
-  WsState _state;
+  bool _running = false;
+  bool _closing = false;
+  bool _paused = false;
+
+  PJ::MessageParserPtr _parser;
 
   QPointer<WebsocketDialog> _dialog;
-  QTimer _topics_timer;
-  QTimer _heartbeat_timer;
-  QTimer _stats_timer;
-  QElapsedTimer _stats_elapsed;
-  uint64_t _ws_msg_count = 0;
-  QHash<QString, uint64_t> _topic_msg_count;
 
-  std::vector<TopicInfo> _topics;
-
-#ifdef PJ_BUILD
-  QHash<QString, PJ::MessageParserPtr> _parsers_topic;
-#endif
-
-  QString sendCommand(QJsonObject obj);
-  QString _pending_request_id;
-  WsState::Mode _pending_mode = WsState::Mode::Close;
-
-  void resetState();
+  void setupSettings();
   void saveDefaultSettings();
   void loadDefaultSettings();
-  void setupSettings();
 
-  void updateOkButton();
-
-  void requestTopics();
-  void sendHeartBeat();
-  void createParsersForTopics();
-  void onRos2CdrMessage(const QString& topic, double ts_sec, const uint8_t* cdr, uint32_t len);
-  bool parseDecompressedPayload(const QByteArray& decompressed, uint32_t expected_count);
-  void printStats();
+  void parseMessage(const uint8_t* data, size_t size);
 
 private slots:
   void onConnected();

@@ -23,5 +23,6 @@ add_subdirectory(ParserProtobuf)
 add_subdirectory(ParserROS)
 add_subdirectory(ParserDataTamer)
 add_subdirectory(ParserLineInflux)
+add_subdirectory(ParserMavlinkRest)
 
 add_subdirectory(PluginsZcm)

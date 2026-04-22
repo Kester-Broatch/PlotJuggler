@@ -3,20 +3,8 @@
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QPushButton>
-#include <QJsonArray>
-#include <QStringList>
-#include <QTreeWidget>
 
 #include "websocket_client_config.h"
-
-struct TopicInfo
-{
-  QString name;
-  QString type;
-  QString schema_name;
-  QString schema_encoding;
-  QString schema_definition;
-};
 
 namespace Ui
 {
@@ -29,39 +17,28 @@ public:
   explicit WebsocketDialog(const WebsocketClientConfig& config);
   ~WebsocketDialog();
 
-  // Address / port
-  QString address() const;
+  // URL
+  QString url() const;
 
-  int port(bool* ok) const;
+  // Protocol selection
+  QString selectedProtocol() const;
+  void setSelectedProtocol(const QString& name);
+  void addProtocol(const QString& name, QWidget* options_widget);
 
-  // Topic list management
-  void setTopics(const QJsonArray& topics, const QStringList& preselectNames);
-
-  bool hasSelection() const;
-
-  QStringList selectedTopicNames() const;
-
-  std::vector<TopicInfo> selectedTopics() const;
-
-  void clearTopics();
+  // Connection state
+  void setConnected(bool connected);
 
   // OK button
   void setOkButton(const QString& text, bool enabled);
 
-  // Parser options
-  unsigned maxArraySize() const;
-  bool clampLargeArrays() const;
-  bool useTimestamp() const;
-
   // Signal access for external connections
   QDialogButtonBox* buttonBox() const;
-
-  QTreeWidget* topicsWidget() const;
-
   QPushButton* connectButton() const;
-  void setConnected(bool connected);
+
+private slots:
+  void onProtocolChanged(const QString& protocol);
 
 private:
-  void applyFilter(const QString& filter);
   Ui::WebSocketDialog* ui;
+  QWidget* _current_options_widget = nullptr;
 };

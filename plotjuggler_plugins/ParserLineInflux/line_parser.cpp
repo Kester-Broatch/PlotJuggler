@@ -57,6 +57,10 @@ public:
       for (auto field : fields)
       {
         const auto field_parts = field.split('=');
+        if (field_parts.size() < 2)
+        {
+          continue;
+        }
         const auto name = field_parts[0].toLocal8Bit();
         auto value = field_parts[1].toLocal8Bit();
 
